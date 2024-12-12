@@ -100,7 +100,21 @@ def get_execution(flow_sid, execution_sid):
 def list_steps(flow_sid, execution_sid):
     try:
         steps = client.studio.v2.flows(flow_sid).executions(execution_sid).steps.list()
-        return jsonify([step._properties for step in steps])
+        # Convert to list and reverse the order
+        steps = list(reversed(steps))
+        return jsonify([{
+            'sid': step.sid,
+            'account_sid': step.account_sid,
+            'flow_sid': step.flow_sid,
+            'execution_sid': step.execution_sid,
+            'name': step.name,
+            'context': step.context,
+            'transitioned_from': step.transitioned_from,
+            'transitioned_to': step.transitioned_to,
+            'date_created': str(step.date_created),
+            'date_updated': str(step.date_updated),
+            'url': step.url
+        } for step in steps])
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 

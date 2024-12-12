@@ -7,6 +7,7 @@ export default function Home() {
   const [executions, setExecutions] = useState([]);
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [executionContent, setExecutionContent] = useState(null);
+  const [executionSteps, setExecutionSteps] = useState(null);
 
   // Fetch flows on component mount
   useEffect(() => {
@@ -43,11 +44,13 @@ export default function Home() {
     const fetchExecutionDetails = async () => {
       if (selectedFlow && selectedExecution) {
         try {
-          const executionData = await studioApi.getExecution(
-            selectedFlow.sid,
-            selectedExecution.sid
-          );
+          const [executionData, stepsData] = await Promise.all([
+            studioApi.getExecution(selectedFlow.sid, selectedExecution.sid),
+            studioApi.listSteps(selectedFlow.sid, selectedExecution.sid)
+          ]);
+          
           setExecutionContent(executionData);
+          setExecutionSteps(stepsData);
         } catch (error) {
           console.error('Error fetching execution details:', error);
         }
@@ -103,9 +106,31 @@ export default function Home() {
       <div className="flex-1 p-4">
         <h2 className="text-lg font-semibold mb-4">Execution Details</h2>
         {executionContent && (
-          <pre className="bg-gray-50 p-4 rounded">
-            {JSON.stringify(executionContent, null, 2)}
-          </pre>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-md font-medium mb-2">Execution Info</h3>
+              <pre className="bg-gray-50 p-4 rounded">
+                {JSON.stringify(executionContent, null, 2)}
+              </pre>
+            </div>
+            
+            {executionSteps && (
+              <div>
+                <h3 className="text-md font-medium mb-2">Execution Steps</h3>
+                <div className="space-y-2">
+                  {executionSteps.map((step) => (
+                    <div key={step.sid} className="bg-gray-50 p-4 rounded">
+                      <div className="font-medium">{step.name}</div>
+                      <div className="text-sm text-gray-600">Status: {step.status}</div>
+                      <pre className="mt-2 text-sm">
+                        {JSON.stringify(step, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

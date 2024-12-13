@@ -111,13 +111,16 @@ def list_steps(flow_sid, execution_sid):
         with open(flow_file, 'r') as f:
             flow_data = json.load(f)
             
-        # Create a mapping of widget names to their types
+        # Create mappings for both widget types and properties
         widget_types = {
             state['name']: state['type']
             for state in flow_data['data']['states']
         }
-        print(widget_types)
-        
+        widget_properties = {
+            state['name']: state.get('properties', {})
+            for state in flow_data['data']['states']
+        }
+
         steps = client.studio.v2.flows(flow_sid).executions(execution_sid).steps.list()
         steps = list(reversed(steps))
 
@@ -132,14 +135,14 @@ def list_steps(flow_sid, execution_sid):
                 
             # Get the widget type from our mapping
             widget_type = widget_types.get(step.transitioned_from, 'unknown')
-                
-            step_data.append({
+            
+            step_info = {
                 'sid': step.sid,
                 'account_sid': step.account_sid,
                 'flow_sid': step.flow_sid,
                 'execution_sid': step.execution_sid,
                 'name': step.name,
-                'widget_type': widget_type,  # Add the widget type
+                'widget_type': widget_type,
                 'context': step.context,
                 'transitioned_from': step.transitioned_from,
                 'transitioned_to': step.transitioned_to,
@@ -147,7 +150,17 @@ def list_steps(flow_sid, execution_sid):
                 'date_updated': str(step.date_updated),
                 'url': step.url,
                 'step_context': step_context.context
-            })
+            }
+            
+            # Add function details if it's a run-function widget
+            if widget_type == 'run-function':
+                properties = widget_properties.get(step.transitioned_from, {})
+                step_info['function'] = {
+                    'service_sid': properties.get('service_sid'),
+                    'environment_sid': properties.get('environment_sid')
+                }
+            
+            step_data.append(step_info)
             
         return jsonify(step_data)
     except Exception as e:
@@ -166,6 +179,28 @@ def get_step_context(flow_sid, execution_sid, step_sid):
     try:
         context = client.studio.v2.flows(flow_sid).executions(execution_sid).steps(step_sid).step_context().fetch()
         return jsonify(context._properties)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/v2/services/<service_sid>/environments/<environment_sid>/logs', methods=['GET'])
+def get_function_logs(service_sid, environment_sid):
+    try:
+        # Get logs from the serverless service
+        logs = client.serverless.v1.services(service_sid)\
+            .environments(environment_sid)\
+            .logs\
+            .list(limit=100)  # Adjust limit as needed
+            
+        return jsonify([{
+            'sid': log.sid,
+            'service_sid': log.service_sid,
+            'environment_sid': log.environment_sid,
+            'function_sid': log.function_sid,
+            'request_sid': log.request_sid,
+            'level': log.level,
+            'message': log.message,
+            'date_created': str(log.date_created)
+        } for log in logs])
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 

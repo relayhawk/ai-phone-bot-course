@@ -8,6 +8,7 @@ export default function Home() {
   const [selectedExecution, setSelectedExecution] = useState(null);
   const [executionContent, setExecutionContent] = useState(null);
   const [executionSteps, setExecutionSteps] = useState(null);
+  const [selectedStepLogs, setSelectedStepLogs] = useState(null);
 
   // Fetch flows on component mount
   useEffect(() => {
@@ -119,9 +120,52 @@ export default function Home() {
                 <h3 className="text-md font-medium mb-2">Execution Steps</h3>
                 <div className="space-y-2">
                   {executionSteps.map((step) => (
+                    // todo: These function logs load the most recent logs, not the logs for the specific function executed. 
                     <div key={step.sid} className="bg-gray-50 p-4 rounded">
-                      <div className="font-medium">{step.name}</div>
-                      <div className="text-sm text-gray-600">Status: {step.status}</div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium">{step.name}</div>
+                          <div className="text-sm text-gray-600">Type: {step.widget_type}</div>
+                        </div>
+                        {step.function && (
+                          <button
+                            onClick={async () => {
+                              const logs = await studioApi.getFunctionLogs(
+                                step.function.service_sid,
+                                step.function.environment_sid
+                              );
+                              setSelectedStepLogs(logs);
+                            }}
+                            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                          >
+                            View Logs
+                          </button>
+                        )}
+                      </div>
+                      
+                      {selectedStepLogs && step.function && (
+                        <div className="mt-4 p-3 bg-gray-100 rounded">
+                          <h4 className="font-medium mb-2">Function Logs</h4>
+                          <div className="max-h-60 overflow-y-auto">
+                            {selectedStepLogs.map((log) => (
+                              <div key={log.sid} className="text-sm mb-2">
+                                <span className={`font-medium ${
+                                  log.level === 'ERROR' ? 'text-red-600' : 
+                                  log.level === 'WARN' ? 'text-yellow-600' : 
+                                  'text-gray-600'
+                                }`}>
+                                  [{log.level}]
+                                </span>
+                                <span className="text-gray-500 ml-2">
+                                  {new Date(log.date_created).toLocaleString()}
+                                </span>
+                                <div className="ml-5">{log.message}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <pre className="mt-2 text-sm">
                         {JSON.stringify(step, null, 2)}
                       </pre>

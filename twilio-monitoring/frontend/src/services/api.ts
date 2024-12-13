@@ -41,5 +41,10 @@ export const studioApi = {
   getStepContext: async (flowSid: string, executionSid: string, stepSid: string) => {
     const response = await fetch(`${API_BASE_URL}/v2/flows/${flowSid}/executions/${executionSid}/steps/${stepSid}/context`);
     return response.json();
+  },
+
+  getFunctionLogs: async (serviceSid: string, environmentSid: string) => {
+    const response = await fetch(`${API_BASE_URL}/v2/services/${serviceSid}/environments/${environmentSid}/logs`);
+    return response.json();
   }
 };

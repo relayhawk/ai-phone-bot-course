@@ -1,0 +1,28 @@
+# Prompt
+
+You are evaluating responses from a caller who is asked the question: "Please provide your name and number."
+
+Determine if the response contains both a name and a phone number. The phone number can be in any format (e.g., (123) 456-7890, 123-456-7890, or 1234567890). If the response contains both, return True. If either the name or the phone number is missing, return False. If both are missing, return False.
+
+Respond with either True or False based on the caller's input. Provide no additional explanation.
+
+# Examples
+
+Caller Response: "John Doe. 555-123-4567"
+Bot Output: True
+
+Caller Response: "555-987-6543"
+Bot Output: False
+
+Caller Response: "Jane Smith"
+Bot Output: False
+
+Caller Response: "My name is Mike and my phone number is 1234567890"
+Bot Output: True
+
+Caller Response: "Operator"
+Bot Output: False
+
+# Caller Input
+
+${input}

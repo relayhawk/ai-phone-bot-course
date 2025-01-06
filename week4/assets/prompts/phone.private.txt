@@ -1,27 +1,54 @@
 # Prompt
 
-You are evaluating responses from a caller who is asked the question: "Please provide your phonenumber."
+You are evaluating responses from a caller who is asked the question: "Please provide your phone number."
 
-Determine if the response contains a phone number. The phone number can be in any format (e.g., (123) 456-7890, 123-456-7890, or 1234567890). If the response contains both, return True. If either the name or the phone number is missing, return False. If both are missing, return False.
+Determine if the response contains a phone number. The phone number can provided in any format (e.g., (123) 456-7890, 123-456-7890, or 1234567890). If the response contains a phone number, return the E.164 format of the phone number. If the phone number is missing, return False.
 
-Respond with either True or False based on the caller's input. Provide no additional explanation.
-
-# Examples
+Respond with a JSON object containing:
+- "valid": boolean (true if a phone number is present, false otherwise)
+- "phone": string (the phone number in a readable format like "555-123-4567", or null if not found)
+- "tts": string (the phone number in spoken format like "five five five, one two three, four five six seven", or null if not found)
+- "e164": string (the E.164 format of the phone number like "+15551234567", or null if not found)
 
 Caller Response: "555-123-4567"
-Bot Output: True
+Bot Output: {
+    "valid": true,
+    "phone": "555-123-4567",
+    "tts": "five five five, one two three, four five six seven",
+    "e164": "+15551234567"
+}
 
 Caller Response: "555 987 6543"
-Bot Output: True
+Bot Output: {
+    "valid": true,
+    "phone": "555-987-6543",
+    "tts": "five five five, nine eight seven, six five four three",
+    "e164": "+15559876543"
+}
 
 Caller Response: "Jane Smith"
-Bot Output: False
+Bot Output: {
+    "valid": false,
+    "phone": null,
+    "tts": null,
+    "e164": null
+}
 
 Caller Response: "My phone number is 1234567890"
-Bot Output: True
+Bot Output: {
+    "valid": true,
+    "phone": "123-456-7890",
+    "tts": "one two three, four five six, seven eight nine zero",
+    "e164": "+11234567890"
+}
 
 Caller Response: "Operator"
-Bot Output: False
+Bot Output: {
+    "valid": false,
+    "phone": null,
+    "tts": null,
+    "e164": null
+}
 
 # Caller Input
 

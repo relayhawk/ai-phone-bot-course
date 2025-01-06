@@ -3,8 +3,6 @@ const axios = require('axios');
 const qs = require('qs');
 
 exports.handler = async function (context, event, callback) {
-    let sessionCookie;
-    
     // Validate required environment variables
     const requiredVars = {
         'AMTELCO_BASE_URL': context.AMTELCO_BASE_URL,
@@ -106,20 +104,15 @@ exports.handler = async function (context, event, callback) {
             // Format the message data
             const messageData = qs.stringify({
                 'cltId': clientId,
-                'listId': listId,
+                // Note: Amtelco's documenation is incorrect. listId is actually listIds and is a string with one listId
+                'listIds': listId,
                 'subject': eventData.subject || 'New message',
                 'message': eventData.message || 'No message provided',
                 'urgent': 'false',
                 'dispatch': 'false'
             });
 
-            console.log('Sending message with data:', {
-                cltId: clientId,
-                listId: listId,
-                subject: eventData.subject || 'New message',
-                urgent: 'false',
-                dispatch: 'false',
-            });
+            console.log('Sending message with data:', qs.parse(messageData));
 
             // Send message with form-urlencoded content type
             const response = await axiosInstance.post('/mobileIS.svc/Message', 
@@ -155,7 +148,9 @@ exports.handler = async function (context, event, callback) {
             }
             
             console.log('Message sent successfully. Response:', response.data);
-            callback(null, response.data);
+            callback(null, { 
+                message_id: response.data.Value 
+            });
 
         } catch (error) {
             console.error('Operation error:', {
@@ -171,7 +166,7 @@ exports.handler = async function (context, event, callback) {
             return;  // Ensure the function exits after handling the error
 
         } finally {
-            if (sessionCookie) {
+            if (cookieJar) {
                 console.log('Attempting logout...');
                 // Logout - no specific content type needed
                 await axiosInstance.get('/mobileIS.svc/Logout');

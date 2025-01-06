@@ -1,63 +1,119 @@
 const axios = require('axios');
 
-async function testLLMFunction() {
-    try {
-        console.log('Starting LLM function test (OpenAI)...');
+// Shared test cases
+const TEST_CASES = [
+    {
+        description: "Valid phone number with spaces",
+        input: "555 987 6543",
+        expected: {
+            valid: true,
+            phone: "555-987-6543",
+            tts: "five five five, nine eight seven, six five four three",
+            e164: "+15559876543"
+        }
+    }
+];
 
-        // Test data
+// Provider configurations
+const PROVIDERS = {
+    anthropic: {
+        PRIMARY_LLM: 'anthropic',
+        SECONDARY_LLM: ''
+    },
+    openai: {
+        PRIMARY_LLM: 'openai',
+        SECONDARY_LLM: ''
+    }
+};
+
+// Shared test function
+async function runLLMTest(provider, testCase) {
+    try {
+        console.log(`Testing ${provider} with: ${testCase.description}`);
+
         const testInput = {
-            provider: "openai",
-            input: "555 987 6543",
-            // note: the .private. part is not needed in the promptLocation
-            promptLocation: "/prompts/phone.txt"
+            provider: provider,
+            input: testCase.input,
+            promptLocation: "/prompts/phone.txt",
+            // Override environment variables
+            ...PROVIDERS[provider]
         };
 
-        // Make request to local Twilio function
+        console.log('Test input:', testInput); // Debug log
+
         const response = await axios.post('http://localhost:3000/llm', testInput, {
             headers: {
                 'Content-Type': 'application/json'
             },
-            // Add this to handle self-signed certificates in local development
             httpsAgent: new (require('https')).Agent({
                 rejectUnauthorized: false
             })
         });
 
-        // Log the full response for debugging
-        console.log('Full response:', response.data);
+        // Basic response validation
+        if (response.status !== 200) {
+            throw new Error(`Expected status 200 but got ${response.status}`);
+        }
 
-        // Assertions
-        console.assert(
-            response.status === 200,
-            `Expected status 200 but got ${response.status}`
-        );
+        // Parse response
+        const parsed = typeof response.data === 'string' 
+            ? JSON.parse(response.data) 
+            : response.data;
 
-        console.assert(
-            response.data.body && typeof response.data.body === 'string',
-            'Expected response to have a body property with string content'
-        );
+        // Validate JSON structure
+        if (typeof parsed.valid !== 'boolean') {
+            throw new Error('Expected response to have a boolean "valid" property');
+        }
 
-        console.assert(
-            response.data.body.length > 0,
-            'Expected non-empty response body'
-        );
+        // Compare with expected results
+        for (const [key, expectedValue] of Object.entries(testCase.expected)) {
+            if (parsed[key] !== expectedValue) {
+                throw new Error(
+                    `${key} mismatch:\n` +
+                    `Expected: ${JSON.stringify(expectedValue)}\n` +
+                    `Got: ${JSON.stringify(parsed[key])}`
+                );
+            }
+        }
 
-        console.assert(
-            response.data.body === 'True',
-            'Expected response to be True'
-        );
-
-        console.log('Test passed successfully!');
-        console.log('Response body:', response.data.body);
+        console.log(`✓ ${provider} test passed:`, testCase.description);
+        console.log('Response:', JSON.stringify(parsed, null, 2));
+        return true;
 
     } catch (error) {
-        console.error('Test failed:', {
+        console.error(`✗ ${provider} test failed:`, {
+            description: testCase.description,
             message: error.message,
             response: error.response?.data || 'No response data',
             status: error.response?.status || 'No status code'
         });
+        return false;
     }
 }
 
-// Run the test
-testLLMFunction(); 
+// Main test runner
+async function runAllTests() {
+    const providers = Object.keys(PROVIDERS);
+    let failedTests = 0;
+
+    for (const provider of providers) {
+        console.log(`\n=== Running ${provider} tests ===\n`);
+        
+        for (const testCase of TEST_CASES) {
+            const passed = await runLLMTest(provider, testCase);
+            if (!passed) failedTests++;
+        }
+    }
+
+    // Exit with appropriate code
+    if (failedTests > 0) {
+        console.error(`\n${failedTests} test(s) failed`);
+        process.exit(1);
+    } else {
+        console.log('\nAll tests passed successfully!');
+        process.exit(0);
+    }
+}
+
+// Run all tests
+runAllTests(); 

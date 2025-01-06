@@ -1,11 +1,13 @@
 const https = require('https');
 const axios = require('axios');
 
-function getLLMConfig(context) {
+function getLLMConfig(context, event) {
   // Required configuration
   const config = {
-      primary: context.PRIMARY_LLM,
-      secondary: context.SECONDARY_LLM,
+      // we load from the event first, then the context
+      // The event is from the client and the context is from the environment variables
+      primary: event.PRIMARY_LLM || context.PRIMARY_LLM,
+      secondary: event.SECONDARY_LLM || context.SECONDARY_LLM,
       providers: {
           openai: {
               apiKey: context.OPENAI_API_KEY,
@@ -18,8 +20,6 @@ function getLLMConfig(context) {
           // Add other providers as needed
       }
   };
-  console.log('Primary LLM provider:', config.primary);
-  console.log('Secondary LLM provider:', config.secondary);
 
   // Validate configuration
   if (!config.primary || !config.providers[config.primary]) {
@@ -192,13 +192,28 @@ exports.handler = async function (context, event, callback) {
             return; // Validation failed and callback was called with error
         }
 
-        const config = getLLMConfig(context);
+        // Pass both context and event to getLLMConfig
+        const config = getLLMConfig(context, event);
+        
+        console.log('Primary LLM provider:', config.primary);
+        console.log('Secondary LLM provider:', config.secondary);
 
         // Now we can safely use the validated fields
         const prompt = await getPrompt(event.promptLocation, event.input);
         const llmClient = new LLMClient(config);
         const response = await llmClient.query(prompt);
-        callback(null, { body: response });
+
+        // Parse the response if it's a string
+        let parsedResponse;
+        try {
+            parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
+        } catch (error) {
+            console.error('Failed to parse LLM response:', error);
+            throw new Error('Invalid JSON response from LLM');
+        }
+
+        // Return the parsed response directly
+        callback(null, parsedResponse);
     } catch (error) {
         console.error('Error:', error);
         callback(error);

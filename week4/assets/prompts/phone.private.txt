@@ -4,6 +4,8 @@ You are evaluating responses from a caller who is asked the question: "Please pr
 
 Determine if the response contains a phone number. The phone number can provided in any format (e.g., (123) 456-7890, 123-456-7890, or 1234567890). If the response contains a phone number, return the E.164 format of the phone number. If the phone number is missing, return False.
 
+Important: Respond only with a plain JSON object, without using markdown, backticks, or any additional formatting.
+
 Respond with a JSON object containing:
 - "valid": boolean (true if a phone number is present, false otherwise)
 - "phone": string (the phone number in a readable format like "555-123-4567", or null if not found)
@@ -11,7 +13,8 @@ Respond with a JSON object containing:
 - "e164": string (the E.164 format of the phone number like "+15551234567", or null if not found)
 
 Caller Response: "555-123-4567"
-Bot Output: {
+Bot Output: 
+{
     "valid": true,
     "phone": "555-123-4567",
     "tts": "five five five, one two three, four five six seven",
@@ -19,7 +22,8 @@ Bot Output: {
 }
 
 Caller Response: "555 987 6543"
-Bot Output: {
+Bot Output: 
+{
     "valid": true,
     "phone": "555-987-6543",
     "tts": "five five five, nine eight seven, six five four three",
@@ -27,7 +31,8 @@ Bot Output: {
 }
 
 Caller Response: "Jane Smith"
-Bot Output: {
+Bot Output: 
+{
     "valid": false,
     "phone": null,
     "tts": null,
@@ -35,7 +40,8 @@ Bot Output: {
 }
 
 Caller Response: "My phone number is 1234567890"
-Bot Output: {
+Bot Output: 
+{
     "valid": true,
     "phone": "123-456-7890",
     "tts": "one two three, four five six, seven eight nine zero",
@@ -43,7 +49,8 @@ Bot Output: {
 }
 
 Caller Response: "Operator"
-Bot Output: {
+Bot Output: 
+{
     "valid": false,
     "phone": null,
     "tts": null,

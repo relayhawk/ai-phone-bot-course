@@ -61,6 +61,15 @@ async function runLLMTest(provider, testCase) {
             })
         });
 
+        // Check for error response
+        if (response.data.error) {
+            throw new Error(JSON.stringify({
+                type: response.data.error.type,
+                message: response.data.error.message,
+                details: response.data.error.details
+            }, null, 2));
+        }
+
         // Basic response validation
         if (response.status !== 200) {
             throw new Error(`Expected status 200 but got ${response.status}`);
@@ -92,12 +101,25 @@ async function runLLMTest(provider, testCase) {
         return true;
 
     } catch (error) {
-        console.error(`✗ ${provider} test failed:`, {
-            description: testCase.description,
-            message: error.message,
-            response: error.response?.data || 'No response data',
-            status: error.response?.status || 'No status code'
-        });
+        let errorOutput = {
+            test: {
+                provider,
+                description: testCase.description
+            },
+            error: {
+                message: error.message
+            }
+        };
+
+        // Add axios error details if available
+        if (error.response?.data?.error) {
+            errorOutput.error = {
+                ...errorOutput.error,
+                ...error.response.data.error
+            };
+        }
+
+        console.error(`\n❌ Test failed:`, JSON.stringify(errorOutput, null, 2));
         return false;
     }
 }

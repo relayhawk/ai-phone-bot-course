@@ -11,11 +11,11 @@ function getLLMConfig(context, event) {
       providers: {
           openai: {
               apiKey: context.OPENAI_API_KEY,
-              model: context.OPENAI_MODEL
+              model: event.OPENAI_MODEL || context.OPENAI_MODEL
           },
           anthropic: {
               apiKey: context.ANTHROPIC_API_KEY,
-              model: context.ANTHROPIC_MODEL
+              model: event.ANTHROPIC_MODEL || context.ANTHROPIC_MODEL
           }
           // Add other providers as needed
       }
@@ -53,12 +53,21 @@ class LLMClient {
   }
 
   async query(prompt) {
+      const startTime = performance.now();
       const response = await this.primaryClient.getResponse(prompt);
+      const endTime = performance.now();
+      const duration = Math.round(endTime - startTime); // Round to nearest millisecond
+
       // Log the tokens used
       console.log('Tokens used:', response.metadata.usage);
+      console.log('Request duration:', duration, 'ms');
+
       return {
           content: response.content,
-          metadata: response.metadata
+          metadata: {
+              ...response.metadata,
+              duration_ms: duration
+          }
       };
   }
 

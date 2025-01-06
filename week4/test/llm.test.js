@@ -16,14 +16,26 @@ const TEST_CASES = [
 
 // Provider configurations
 const PROVIDERS = {
-    anthropic: {
+    claude_3_sonnet_20240229: {
         PRIMARY_LLM: 'anthropic',
-        SECONDARY_LLM: ''
+        SECONDARY_LLM: '',
+        ANTHROPIC_MODEL: 'claude-3-sonnet-20240229'
     },
-    openai: {
+    claude_3_5_haiku_latest: {
+        PRIMARY_LLM: 'anthropic',
+        SECONDARY_LLM: '',
+        ANTHROPIC_MODEL: 'claude-3-5-haiku-latest'
+    },
+    gpt_4_turbo_preview: {
         PRIMARY_LLM: 'openai',
-        SECONDARY_LLM: ''
-    }
+        SECONDARY_LLM: '',
+        OPENAI_MODEL: 'gpt-4-turbo-preview'
+    },
+    gpt_4o_mini: {
+        PRIMARY_LLM: 'openai',
+        SECONDARY_LLM: '',
+        OPENAI_MODEL: 'gpt-4o-mini'
+    },
 };
 
 // Shared test function
@@ -35,7 +47,6 @@ async function runLLMTest(provider, testCase) {
             provider: provider,
             input: testCase.input,
             promptLocation: "/prompts/phone.txt",
-            // Override environment variables
             ...PROVIDERS[provider]
         };
 

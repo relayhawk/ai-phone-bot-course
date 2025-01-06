@@ -249,17 +249,58 @@ exports.handler = async function (context, event, callback) {
                 ? JSON.parse(response.content) 
                 : response.content;
         } catch (error) {
-            console.error('Failed to parse LLM response:', error);
-            throw new Error('Invalid JSON response from LLM');
+            // Log the raw response for debugging
+            console.log('Raw LLM response:', {
+                content: response.content,
+                type: typeof response.content
+            });
+            // Create a structured error response
+            const errorResponse = {
+                error: {
+                    type: 'PARSE_ERROR',
+                    message: 'Failed to parse LLM response',
+                    details: {
+                        cause: error.message,
+                        rawContent: response.content?.substring(0, 100) + '...',  // Truncate long responses
+                        provider: config.primary,
+                        model: config.providers[config.primary].model
+                    }
+                },
+                _metadata: {
+                    timestamp: new Date().toISOString(),
+                    success: false
+                }
+            };
+            
+            console.error('Parse error:', errorResponse);
+            return callback(null, errorResponse, 400);
         }
 
-        // Return both the parsed content and usage statistics
+        // Return both the parsed content and metadata
         callback(null, {
             ...parsedContent,
             _metadata: response.metadata
         });
+
     } catch (error) {
-        console.error('Error:', error);
-        callback(error);
+        // Handle other runtime errors
+        const errorResponse = {
+            error: {
+                type: 'RUNTIME_ERROR',
+                message: error.message,
+                details: {
+                    stack: error.stack?.split('\n'),
+                    provider: config.primary,
+                    model: config.providers[config.primary].model
+                }
+            },
+            _metadata: {
+                timestamp: new Date().toISOString(),
+                success: false
+            }
+        };
+
+        console.error('Runtime error:', errorResponse);
+        return callback(null, errorResponse, 500);
     }
 };

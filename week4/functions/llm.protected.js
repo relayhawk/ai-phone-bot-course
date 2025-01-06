@@ -53,8 +53,13 @@ class LLMClient {
   }
 
   async query(prompt) {
-      // Use preferred provider if specified, otherwise use primary
-      return await this.primaryClient.getResponse(prompt);
+      const response = await this.primaryClient.getResponse(prompt);
+      // Log the tokens used
+      console.log('Tokens used:', response.metadata.usage);
+      return {
+          content: response.content,
+          metadata: response.metadata
+      };
   }
 
  
@@ -82,7 +87,20 @@ class OpenAIClient {
           },
         }
       );
-      return response.data.choices[0].message.content;
+
+      return {
+          content: response.data.choices[0].message.content,
+          metadata: {
+              provider: 'openai',
+              model: response.data.model,
+              request_id: response.data.id,
+              usage: {
+                  input_tokens: response.data.usage.prompt_tokens,
+                  output_tokens: response.data.usage.completion_tokens,
+                  total_tokens: response.data.usage.total_tokens
+              }
+          }
+      };
     }
   }
 
@@ -146,7 +164,19 @@ class AnthropicClient {
           }
         );
         
-        return response.data.content[0].text;
+        return {
+            content: response.data.content[0].text,
+            metadata: {
+                provider: 'anthropic',
+                model: response.data.model,
+                request_id: response.data.id,
+                usage: {
+                    input_tokens: response.data.usage.input_tokens,
+                    output_tokens: response.data.usage.output_tokens,
+                    total_tokens: response.data.usage.input_tokens + response.data.usage.output_tokens
+                }
+            }
+        };
       } catch (error) {
         // Log the detailed error information
         console.error('Anthropic API Error:', {
@@ -203,17 +233,22 @@ exports.handler = async function (context, event, callback) {
         const llmClient = new LLMClient(config);
         const response = await llmClient.query(prompt);
 
-        // Parse the response if it's a string
-        let parsedResponse;
+        // Parse the content if it's a string
+        let parsedContent;
         try {
-            parsedResponse = typeof response === 'string' ? JSON.parse(response) : response;
+            parsedContent = typeof response.content === 'string' 
+                ? JSON.parse(response.content) 
+                : response.content;
         } catch (error) {
             console.error('Failed to parse LLM response:', error);
             throw new Error('Invalid JSON response from LLM');
         }
 
-        // Return the parsed response directly
-        callback(null, parsedResponse);
+        // Return both the parsed content and usage statistics
+        callback(null, {
+            ...parsedContent,
+            _metadata: response.metadata
+        });
     } catch (error) {
         console.error('Error:', error);
         callback(error);

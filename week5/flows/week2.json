@@ -1,0 +1,178 @@
+{
+    "description": "Week2",
+    "states": [
+      {
+        "name": "Trigger",
+        "type": "trigger",
+        "transitions": [
+          {
+            "event": "incomingMessage"
+          },
+          {
+            "next": "CollectInformation",
+            "event": "incomingCall"
+          },
+          {
+            "event": "incomingConversationMessage"
+          },
+          {
+            "event": "incomingRequest"
+          },
+          {
+            "event": "incomingParent"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "CollectInformation",
+        "type": "gather-input-on-call",
+        "transitions": [
+          {
+            "event": "keypress"
+          },
+          {
+            "next": "CollectInfoOpenAI",
+            "event": "speech"
+          },
+          {
+            "event": "timeout"
+          }
+        ],
+        "properties": {
+          "voice": "man",
+          "speech_timeout": "auto",
+          "offset": {
+            "x": 140,
+            "y": 190
+          },
+          "loop": 1,
+          "finish_on_key": "#",
+          "say": "Please provide your name and phone number.",
+          "language": "en-US",
+          "stop_gather": true,
+          "gather_language": "en",
+          "profanity_filter": "true",
+          "timeout": 10
+        }
+      },
+      {
+        "name": "CollectInfoOpenAI",
+        "type": "run-function",
+        "transitions": [
+          {
+            "next": "PlayOpenAIResponse",
+            "event": "success"
+          },
+          {
+            "event": "fail"
+          }
+        ],
+        "properties": {
+          "service_sid": "ZS2b9d45989f298e089e18b1ea28f61b26",
+          "environment_sid": "ZE4fe08e65ce559bc8465f2871246600a7",
+          "offset": {
+            "x": 160,
+            "y": 460
+          },
+          "parameters": [
+            {
+              "value": "{{widgets.CollectInformation.SpeechResult}}",
+              "key": "input"
+            }
+          ],
+          "url": "https://week-two-relayhawk-generated-1183-dev.twil.io/openai"
+        }
+      },
+      {
+        "name": "PlayOpenAIResponse",
+        "type": "say-play",
+        "transitions": [
+          {
+            "next": "isAllInformationIncluded",
+            "event": "audioComplete"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 150,
+            "y": 710
+          },
+          "loop": 1,
+          "say": "{{widgets.CollectInfoOpenAI.parsed.body}}"
+        }
+      },
+      {
+        "name": "isAllInformationIncluded",
+        "type": "split-based-on",
+        "transitions": [
+          {
+            "event": "noMatch"
+          },
+          {
+            "next": "CollectedAllInformation",
+            "event": "match",
+            "conditions": [
+              {
+                "friendly_name": "If value equal_to true",
+                "arguments": [
+                  "{{widgets.CollectInfoOpenAI.parsed.body}}"
+                ],
+                "type": "equal_to",
+                "value": "true"
+              }
+            ]
+          },
+          {
+            "next": "CollectInformation",
+            "event": "match",
+            "conditions": [
+              {
+                "friendly_name": "If value equal_to false",
+                "arguments": [
+                  "{{widgets.CollectInfoOpenAI.parsed.body}}"
+                ],
+                "type": "equal_to",
+                "value": "false"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "input": "{{widgets.CollectInfoOpenAI.parsed.body}}",
+          "offset": {
+            "x": -370,
+            "y": 920
+          }
+        }
+      },
+      {
+        "name": "CollectedAllInformation",
+        "type": "say-play",
+        "transitions": [
+          {
+            "event": "audioComplete"
+          }
+        ],
+        "properties": {
+          "voice": "man",
+          "offset": {
+            "x": -230,
+            "y": 1200
+          },
+          "loop": 1,
+          "say": "thank you",
+          "language": "en-US"
+        }
+      }
+    ],
+    "initial_state": "Trigger",
+    "flags": {
+      "allow_concurrent_calls": true
+    }
+  }

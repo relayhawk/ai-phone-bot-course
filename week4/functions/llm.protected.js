@@ -8,16 +8,14 @@ function getLLMConfig(context, event) {
       // The event is from the client and the context is from the environment variables
       primary: event.PRIMARY_LLM || context.PRIMARY_LLM,
       secondary: event.SECONDARY_LLM || context.SECONDARY_LLM,
+      model: event.PRIMARY_MODEL || context.PRIMARY_MODEL,
       providers: {
           openai: {
-              apiKey: context.OPENAI_API_KEY,
-              model: event.OPENAI_MODEL || context.OPENAI_MODEL
+              apiKey: context.OPENAI_API_KEY
           },
           anthropic: {
-              apiKey: context.ANTHROPIC_API_KEY,
-              model: event.ANTHROPIC_MODEL || context.ANTHROPIC_MODEL
+              apiKey: context.ANTHROPIC_API_KEY
           }
-          // Add other providers as needed
       }
   };
 
@@ -29,6 +27,13 @@ function getLLMConfig(context, event) {
   if (config.secondary && !config.providers[config.secondary]) {
       throw new Error('Secondary LLM provider not properly configured');
   }
+
+  if (!config.model) {
+      throw new Error('Primary model not configured');
+  }
+
+  // Add model to the appropriate provider
+  config.providers[config.primary].model = config.model;
 
   return config;
 }
@@ -235,6 +240,7 @@ exports.handler = async function (context, event, callback) {
         const config = getLLMConfig(context, event);
         
         console.log('Primary LLM provider:', config.primary);
+        console.log('Primary LLM model:', config.model);
         console.log('Secondary LLM provider:', config.secondary);
 
         // Now we can safely use the validated fields

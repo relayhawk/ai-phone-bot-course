@@ -18,23 +18,23 @@ const TEST_CASES = [
 const PROVIDERS = {
     claude_3_sonnet_20240229: {
         PRIMARY_LLM: 'anthropic',
+        PRIMARY_MODEL: 'claude-3-sonnet-20240229',
         SECONDARY_LLM: '',
-        ANTHROPIC_MODEL: 'claude-3-sonnet-20240229'
     },
     claude_3_5_haiku_latest: {
         PRIMARY_LLM: 'anthropic',
+        PRIMARY_MODEL: 'claude-3-5-haiku-latest',
         SECONDARY_LLM: '',
-        ANTHROPIC_MODEL: 'claude-3-5-haiku-latest'
     },
     gpt_4_turbo_preview: {
         PRIMARY_LLM: 'openai',
+        PRIMARY_MODEL: 'gpt-4-turbo-preview',
         SECONDARY_LLM: '',
-        OPENAI_MODEL: 'gpt-4-turbo-preview'
     },
     gpt_4o_mini: {
         PRIMARY_LLM: 'openai',
+        PRIMARY_MODEL: 'gpt-4o-mini',
         SECONDARY_LLM: '',
-        OPENAI_MODEL: 'gpt-4o-mini'
     },
 };
 

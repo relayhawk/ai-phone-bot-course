@@ -1,5 +1,21 @@
+// Initialize DataDog tracer with logging
+const tracer = require('dd-trace').init({})
+
+// Check if tracer is running
+if (tracer) {
+    console.log('DataDog tracer initialized successfully');
+} else {
+    console.warn('DataDog tracer failed to initialize');
+}
+
+// Add a console log of the environment variables
+console.log('Environment variables:', process.env);
+
 const https = require('https');
 const axios = require('axios');
+const { performance, PerformanceObserver } = require('perf_hooks');
+const dns = require('dns');
+const { URL } = require('url');
 
 function getLLMConfig(context, event) {
   // Required configuration
@@ -41,36 +57,44 @@ function getLLMConfig(context, event) {
 class LLMClient {
   constructor(config) {
       this.config = config;
-      this.primaryProvider = config.primary;
       
-      // Initialize the appropriate client based on the provider
-      const providerConfig = this.config.providers[this.primaryProvider];
-      switch (this.primaryProvider) {
-          case 'openai':
-              this.primaryClient = new OpenAIClient(providerConfig.model, providerConfig.apiKey);
-              break;
-          case 'anthropic':
-              this.primaryClient = new AnthropicClient(providerConfig.model, providerConfig.apiKey);
-              break;
-          default:
-              throw new Error(`Unsupported LLM provider: ${this.primaryProvider}`);
+      // Pass config to client constructors
+      if (config.providers.openai) {
+          this.openaiClient = new OpenAIClient(
+              config.providers.openai.apiKey,
+              config.providers.openai.model,
+              'https://api.openai.com/v1/chat/completions',
+              config
+          );
+      }
+      
+      if (config.providers.anthropic) {
+          this.anthropicClient = new AnthropicClient(
+              config.providers.anthropic.apiKey,
+              config.providers.anthropic.model,
+              'https://api.anthropic.com/v1/messages',
+              config
+          );
+      }
+
+      // Set primary client
+      this.primaryClient = this[`${config.primary}Client`];
+      if (!this.primaryClient) {
+          throw new Error(`Primary provider ${config.primary} not configured`);
       }
   }
 
   async query(prompt) {
       const startTime = performance.now();
       const response = await this.primaryClient.getResponse(prompt);
-      const endTime = performance.now();
-      const duration = Math.round(endTime - startTime); // Round to nearest millisecond
+      const duration = Math.round(performance.now() - startTime);
 
-      // Log the tokens used
-      console.log('Tokens used:', response.metadata.usage);
-      console.log('Request duration:', duration, 'ms');
-
+      // Add provider information here
       return {
           content: response.content,
           metadata: {
               ...response.metadata,
+              provider: this.config.primary,
               duration_ms: duration
           }
       };
@@ -80,43 +104,107 @@ class LLMClient {
 }
   
 class OpenAIClient {
-    constructor(model, apiKey) {
-      this.model = model;
-      this.apiKey = apiKey;
-      this.apiUrl = 'https://api.openai.com/v1/chat/completions';
+    constructor(apiKey, model, apiUrl, config) {
+        this.apiKey = apiKey;
+        this.model = model;
+        this.apiUrl = apiUrl;
+        this.config = config;
     }
   
     async getResponse(prompt) {
-      const axios = require('axios');
-      const response = await axios.post(
-        this.apiUrl,
-        {
-          model: this.model,
-          messages: [{ role: 'user', content: prompt }],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+        const url = new URL(this.apiUrl);
+        const timings = {
+            start: performance.now(),
+            dnsStart: 0,
+            dnsEnd: 0,
+            connectStart: 0,
+            connectEnd: 0,
+            tlsStart: 0,
+            tlsEnd: 0,
+            firstByte: 0,
+            end: 0
+        };
 
-      return {
-          content: response.data.choices[0].message.content,
-          metadata: {
-              provider: 'openai',
-              model: response.data.model,
-              request_id: response.data.id,
-              usage: {
-                  input_tokens: response.data.usage.prompt_tokens,
-                  output_tokens: response.data.usage.completion_tokens,
-                  total_tokens: response.data.usage.total_tokens
-              }
-          }
-      };
+        // DNS Lookup
+        timings.dnsStart = performance.now();
+        await new Promise((resolve, reject) => {
+            dns.lookup(url.hostname, (err, address) => {
+                timings.dnsEnd = performance.now();
+                if (err) reject(err);
+                resolve(address);
+            });
+        });
+
+        // Make the request with detailed timing
+        const response = await axios.post(
+            this.apiUrl,
+            {
+                model: this.model,
+                messages: [{ role: 'user', content: prompt }]
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                beforeRedirect: () => {
+                    if (!timings.connectEnd) {
+                        timings.connectEnd = performance.now();
+                    }
+                },
+                beforeRedirect: () => {
+                    if (!timings.connectStart) {
+                        timings.connectStart = performance.now();
+                    }
+                },
+                onUploadProgress: () => {
+                    if (!timings.tlsEnd) {
+                        timings.tlsEnd = performance.now();
+                    }
+                },
+                onDownloadProgress: () => {
+                    if (!timings.firstByte) {
+                        timings.firstByte = performance.now();
+                    }
+                }
+            }
+        );
+
+        timings.end = performance.now();
+
+        // Log detailed timing information
+        console.log('Request timing:', {
+            dns: `${Math.round(timings.dnsEnd - timings.dnsStart)}ms`,
+            connection: `${Math.round(timings.connectEnd - timings.connectStart)}ms`,
+            tls: `${Math.round(timings.tlsEnd - timings.tlsStart)}ms`,
+            ttfb: `${Math.round(timings.firstByte - timings.start)}ms`,
+            total: `${Math.round(timings.end - timings.start)}ms`,
+            serverProcessing: `${Math.round(timings.end - (timings.dnsStart + (timings.connectEnd - timings.connectStart) + (timings.tlsEnd - timings.tlsStart)))}ms`
+        });
+
+        return {
+            content: response.data.choices[0].message.content,
+            metadata: {
+                model: response.data.model,
+                request_id: response.data.id,
+                usage: {
+                    input_tokens: response.data.usage.prompt_tokens,
+                    output_tokens: response.data.usage.completion_tokens,
+                    total_tokens: response.data.usage.total_tokens
+                },
+                timing: {
+                    dns_ms: Math.round(timings.dnsEnd - timings.dnsStart),
+                    connection_ms: Math.round(timings.connectEnd - timings.connectStart),
+                    tls_ms: Math.round(timings.tlsEnd - timings.tlsStart),
+                    ttfb_ms: Math.round(timings.firstByte - timings.start),
+                    total_ms: Math.round(timings.end - timings.start),
+                    server_ms: Math.round(timings.end - (timings.dnsStart + (timings.connectEnd - timings.connectStart) + (timings.tlsEnd - timings.tlsStart)))
+                },
+                timestamp: new Date().toISOString()
+            }
+        };
     }
-  }
+}
 
 // Fetch and prepare the prompt
 async function getPrompt(promptLocation, input) {
@@ -148,67 +236,117 @@ async function getPrompt(promptLocation, input) {
 }
 
 class AnthropicClient {
-    constructor(model, apiKey) {
-      this.model = model;
-      this.apiKey = apiKey;
-      this.apiUrl = 'https://api.anthropic.com/v1/messages';
+    constructor(apiKey, model, apiUrl, config) {
+        this.apiKey = apiKey;
+        this.model = model;
+        this.apiUrl = apiUrl;
+        this.config = config;
     }
   
     async getResponse(prompt) {
-      const axios = require('axios');
-      try {
+        const url = new URL(this.apiUrl);
+        const timings = {
+            start: performance.now(),
+            dnsStart: 0,
+            dnsEnd: 0,
+            connectStart: 0,
+            connectEnd: 0,
+            tlsStart: 0,
+            tlsEnd: 0,
+            firstByte: 0,
+            end: 0
+        };
+
+        // DNS Lookup
+        timings.dnsStart = performance.now();
+        await new Promise((resolve, reject) => {
+            dns.lookup(url.hostname, (err, address) => {
+                timings.dnsEnd = performance.now();
+                if (err) reject(err);
+                resolve(address);
+            });
+        });
+
+        // Make the request with detailed timing
         const response = await axios.post(
-          this.apiUrl,
-          {
-            model: this.model,
-            max_tokens: 1024,
-            messages: [
-              {
-                role: "user",
-                content: prompt
-              }
-            ]
-          },
-          {
-            headers: {
-              'anthropic-version': '2023-06-01',
-              'x-api-key': this.apiKey,
-              'Content-Type': 'application/json',
+            this.apiUrl,
+            {
+                model: this.model,
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 1024
             },
-          }
+            {
+                headers: {
+                    'anthropic-version': '2023-06-01',
+                    'x-api-key': this.apiKey,
+                    'Content-Type': 'application/json'
+                },
+                beforeRedirect: () => {
+                    if (!timings.connectEnd) {
+                        timings.connectEnd = performance.now();
+                    }
+                },
+                beforeRedirect: () => {
+                    if (!timings.connectStart) {
+                        timings.connectStart = performance.now();
+                    }
+                },
+                onUploadProgress: () => {
+                    if (!timings.tlsEnd) {
+                        timings.tlsEnd = performance.now();
+                    }
+                },
+                onDownloadProgress: () => {
+                    if (!timings.firstByte) {
+                        timings.firstByte = performance.now();
+                    }
+                }
+            }
         );
-        
+
+        timings.end = performance.now();
+
+        // Calculate durations
+        const durations = {
+            dns: timings.dnsEnd - timings.dnsStart,
+            connect: (timings.connectEnd - timings.connectStart) || (timings.tlsEnd - timings.dnsEnd),
+            tls: timings.tlsEnd - (timings.connectEnd || timings.dnsEnd),
+            ttfb: timings.firstByte - timings.start,
+            total: timings.end - timings.start
+        };
+
+        // Log the detailed timing information
+        console.log('Anthropic request timing details:', {
+            timings,
+            durations
+        });
+
         return {
             content: response.data.content[0].text,
             metadata: {
-                provider: 'anthropic',
                 model: response.data.model,
                 request_id: response.data.id,
                 usage: {
                     input_tokens: response.data.usage.input_tokens,
                     output_tokens: response.data.usage.output_tokens,
                     total_tokens: response.data.usage.input_tokens + response.data.usage.output_tokens
-                }
+                },
+                timing: {
+                    dns_ms: Math.round(durations.dns),
+                    connection_ms: Math.round(durations.connect),
+                    tls_ms: Math.round(durations.tls),
+                    ttfb_ms: Math.round(durations.ttfb),
+                    total_ms: Math.round(durations.total),
+                    server_ms: Math.round(durations.ttfb - durations.dns - durations.connect - durations.tls)
+                },
+                timestamp: new Date().toISOString()
             }
         };
-      } catch (error) {
-        // Log the detailed error information
-        console.error('Anthropic API Error:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          errorType: error.response?.data?.error?.type,
-          errorMessage: error.response?.data?.error?.message
-        });
-        
-        // Re-throw the error to be handled by the caller
-        throw error;
-      }
     }
 }
 
 function validateEventFields(event, callback) {
     const requiredFields = {
-        'provider': 'string',
         'input': 'string',
         'promptLocation': 'string'
     };
@@ -235,6 +373,9 @@ exports.handler = async function (context, event, callback) {
         if (!validateEventFields(event, callback)) {
             return; // Validation failed and callback was called with error
         }
+        const span = tracer.startSpan('llm.protected', {
+            resource: 'llm.protected', // Optional: specify the resource name
+          });
 
         // Pass both context and event to getLLMConfig
         const config = getLLMConfig(context, event);
@@ -279,13 +420,17 @@ exports.handler = async function (context, event, callback) {
             };
             
             console.error('Parse error:', errorResponse);
+            span.finish();
             return callback(null, errorResponse, 400);
         }
 
         // Return both the parsed content and metadata
         callback(null, {
             ...parsedContent,
-            _metadata: response.metadata
+            _metadata: {
+                ...response.metadata,
+                timestamp: new Date().toISOString()
+            }
         });
 
     } catch (error) {
@@ -295,9 +440,7 @@ exports.handler = async function (context, event, callback) {
                 type: 'RUNTIME_ERROR',
                 message: error.message,
                 details: {
-                    stack: error.stack?.split('\n'),
-                    provider: config.primary,
-                    model: config.providers[config.primary].model
+                    stack: error.stack?.split('\n')
                 }
             },
             _metadata: {

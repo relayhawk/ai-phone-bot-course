@@ -208,7 +208,6 @@ class AnthropicClient {
 
 function validateEventFields(event, callback) {
     const requiredFields = {
-        'provider': 'string',
         'input': 'string',
         'promptLocation': 'string'
     };

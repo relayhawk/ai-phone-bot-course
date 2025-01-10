@@ -1,0 +1,60 @@
+{
+  "sections": {
+    "main": [
+      {
+        "answer": {}
+      },
+      {
+        "record_call": {
+          "format": "wav",
+          "stereo": true
+        }
+      },
+      {
+        "ai": {
+          "SWAIG": {
+            "defaults": {
+              "web_hook_url": "{{ base_url }}/swaig"
+            },
+            "functions": [],
+            "includes": [
+              {
+                "functions": {{ functions | tojson }},
+                "url": "{{ base_url }}/swaig"
+              }
+            ],
+            "native_functions": []
+          },
+          "hints": [],
+          "languages": [
+            {
+              "code": "en-US",
+              "language": "English",
+              "name": "English",
+              "voice": "openai.alloy"
+            }
+          ],
+          "params": {
+            "debug_webhook_level": "2",
+            "debug_webhook_url": "{{ base_url }}/debug",
+            "enable_accounting": "true"
+          },
+          "post_prompt": {
+            "max_tokens": 0,
+            "temperature": 0.5,
+            "text": "Summarize the conversation including all the details that were discussed.",
+            "top_p": 0.5
+          },
+          "post_prompt_url": "{{ base_url }}/postprompt",
+          "prompt": {
+            "temperature": 0.5,
+            "text": {{ prompt_text | tojson }},
+            "top_p": 0.5
+          },
+          "pronounce": []
+        }
+      }
+    ]
+  },
+  "version": "1.0.0"
+} 

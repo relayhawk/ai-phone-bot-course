@@ -1,0 +1,5 @@
+Flask
+Requests
+signalwire_swaig
+gunicorn
+python-dotenv

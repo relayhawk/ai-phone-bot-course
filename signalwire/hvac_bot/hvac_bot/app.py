@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 import json
 import time
+import uuid
 
 load_dotenv()
 
@@ -175,6 +176,32 @@ def create_swaml():
     else:
         return Response(swaml, mimetype='text/plain')
 
+def log_request_data(request_data, endpoint_name):
+    """Helper function to log request data to a uniquely named file."""
+    # Create a unique filename using the current timestamp and a UUID
+    timestamp = int(time.time())  # Get the current time in seconds
+    unique_id = str(uuid.uuid4())  # Generate a UUID
+    log_file_path = f'logs/{endpoint_name}_request_{timestamp}_{unique_id}.log'  # Create a unique filename
+
+    # Save the raw JSON to a file in the logs directory
+    with open(log_file_path, 'w') as log_file:  # Use 'w' to create a new file
+        log_file.write(json.dumps(request_data, indent=4))  # Write the JSON data to the file
+
+    return log_file_path
+
+@app.route('/debug', methods=['POST'])
+def debug():
+    # Get the raw JSON request
+    request_data = request.json
+    log_file_path = log_request_data(request_data, "debug")  # Log the request data with endpoint name
+    return jsonify({"message": "Debug request received", "file": log_file_path}), 200
+
+@app.route('/postprompt', methods=['POST'])
+def post_prompt():
+    # Get the raw JSON request
+    request_data = request.json
+    log_file_path = log_request_data(request_data, "postprompt")  # Log the request data with endpoint name
+    return jsonify({"message": "Prompt received", "file": log_file_path}), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=os.getenv("PORT", 5000), debug=os.getenv("DEBUG"))

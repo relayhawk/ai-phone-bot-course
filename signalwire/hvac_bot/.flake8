@@ -1,0 +1,6 @@
+[flake8]
+# Exclude line length check (E501)
+ignore = E501
+
+# Exclude line continuation check (E128)
+ignore = E128

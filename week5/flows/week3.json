@@ -1,0 +1,139 @@
+{
+    "description": "Week3",
+    "states": [
+      {
+        "name": "Trigger",
+        "type": "trigger",
+        "transitions": [
+          {
+            "event": "incomingMessage"
+          },
+          {
+            "next": "variables",
+            "event": "incomingCall"
+          },
+          {
+            "event": "incomingConversationMessage"
+          },
+          {
+            "event": "incomingRequest"
+          },
+          {
+            "event": "incomingParent"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      },
+      {
+        "name": "variables",
+        "type": "set-variables",
+        "transitions": [
+          {
+            "next": "say_play_1",
+            "event": "next"
+          }
+        ],
+        "properties": {
+          "variables": [
+            {
+              "type": "string",
+              "value": "4703166952",
+              "key": "phone_number"
+            },
+            {
+              "type": "string",
+              "value": "Justin",
+              "key": "first_name"
+            }
+          ],
+          "offset": {
+            "x": 130,
+            "y": 230
+          }
+        }
+      },
+      {
+        "name": "function_2",
+        "type": "run-function",
+        "transitions": [
+          {
+            "next": "connect_call_1",
+            "event": "success"
+          },
+          {
+            "next": "connect_call_1",
+            "event": "fail"
+          }
+        ],
+        "properties": {
+          "service_sid": "ZSfa4e3ac4c6a6e7fc5e6f68b06dfb6bef",
+          "environment_sid": "ZE65f23dceaec678da10fcccc423e94fd3",
+          "offset": {
+            "x": 130,
+            "y": 660
+          },
+          "function_sid": "ZHc76040feeb9c2f034934e146270e9342",
+          "parameters": [
+            {
+              "value": "Test Subject",
+              "key": "subject"
+            },
+            {
+              "value": "Phone number: {{widgets.variables.phone_number}}  First Name: {{widgets.variables.first_name}}",
+              "key": "message"
+            }
+          ],
+          "url": "https://week3-4648-dev.twil.io/external-api"
+        }
+      },
+      {
+        "name": "connect_call_1",
+        "type": "connect-call-to",
+        "transitions": [
+          {
+            "event": "callCompleted"
+          },
+          {
+            "event": "hangup"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 130,
+            "y": 870
+          },
+          "caller_id": "{{contact.channel.address}}",
+          "noun": "number",
+          "to": "{{widgets.variables.phone_number}}",
+          "timeout": 30
+        }
+      },
+      {
+        "name": "say_play_1",
+        "type": "say-play",
+        "transitions": [
+          {
+            "next": "function_2",
+            "event": "audioComplete"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 130,
+            "y": 450
+          },
+          "loop": 1,
+          "say": "I am going to transfer your call to the number <say-as interpret-as=\"telephone\"> {{widgets.variables.phone_number}}</say-as>. I have your name spelled <say-as interpret-as=\"spell-out\">Justin</say-as>. I will now submit this information to our API and transfer your call."
+        }
+      }
+    ],
+    "initial_state": "Trigger",
+    "flags": {
+      "allow_concurrent_calls": true
+    }
+  }

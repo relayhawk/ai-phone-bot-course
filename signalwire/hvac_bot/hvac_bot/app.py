@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 import json
 import time
-import uuid
+from models.lead import Lead
+from marshmallow import ValidationError
+from models.appointment import Appointment
+import uuid  # Import the uuid module
 
 load_dotenv()
 
@@ -18,28 +21,36 @@ swaig = SWAIG(
     auth=(os.getenv('HTTP_USERNAME'), os.getenv('HTTP_PASSWORD'))
 )
 
+# Create logs directory if it doesn't exist
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
 def create_lead(first_name, last_name, phone, address, city, state, zip, country, meta_data):
     logging.info(f"Creating lead: {first_name} {last_name} {phone} {address} {city} {state} {zip} {country}")
     logging.info(f"Meta data: {meta_data}")
     return {"response": "Lead created successfully"}
 
+def create_appointment(date, time):
+    logging.info(f"Creating appointment: {date} {time}")
+    return {"response": "Appointment created successfully"}
 
-# required=true on params will only make the call after the params are provided
-# azure voices will repeat phone nubmers best
-# use cartesia to best control speed and emotion
-@swaig.endpoint("Create a user lead",
-    first_name=SWAIGArgument("string", "The first name of the user"),
-    last_name=SWAIGArgument("string", "The last name of the user"),
-    # email=SWAIGArgument("string", "The email address of the user"),
-    phone=SWAIGArgument("string", "The phone number of the user"),
-    address=SWAIGArgument("string", "The address of the user"),
-    city=SWAIGArgument("string", "The city of the user"),
-    state=SWAIGArgument("string", "The state of the user"),
-    zip=SWAIGArgument("string", "The zip code of the user"),
-    country=SWAIGArgument("string", "The country of the user"))
-def swaig_create_lead(first_name, last_name, phone, address, city, state, zip, country, meta_data, meta_data_token):
-        create_lead(first_name, last_name, phone, address, city, state, zip, country, meta_data)
+@swaig.endpoint(**Lead.get_endpoint("create"))
+def swaig_create_lead(data: dict, meta_data_token: str) -> str:
+    try:
+        lead = Lead().load(data)  # Validate and deserialize input
+        # Process lead creation logic here
         return "Lead created successfully"
+    except ValidationError as e:
+        return f"Validation error: {e.messages}"
+
+@swaig.endpoint(**Appointment.get_endpoint("create"))
+def swaig_create_appointment(data: dict, meta_data_token: str) -> str:
+    try:
+        appointment = Appointment().load(data)  # Validate and deserialize input
+        # Process appointment creation logic here
+        return "Appointment created successfully"
+    except ValidationError as e:
+        return f"Validation error: {e.messages}"
 
 
 def get_ngrok_url():
@@ -121,6 +132,7 @@ def generate_prompt_text(template_path, swaig_instance):
     for idx, (func_name, func_info) in enumerate(swaig_instance.functions.items(), 1):
         # Get parameters info
         params = []
+        logging.info(f"Function info: {func_info}")
         if 'parameters' in func_info:
             properties = func_info['parameters'].get('properties', {})
             required_params = func_info['parameters'].get('required', [])
@@ -130,13 +142,16 @@ def generate_prompt_text(template_path, swaig_instance):
                 param_desc = param_info.get('description', '')
                 param_default = param_info.get('default')
                 
-                param_doc = f"   - {param_name} ({param_type})"
+                # Check if the parameter is required
+                required_status = "true" if param_name in required_params else "false"
+                
+                # Construct the parameter documentation
+                param_doc = f"   - {param_name} (type:{param_type}, required:{required_status})"
+                
                 if param_desc:
                     param_doc += f": {param_desc}"
                 if param_default is not None:
                     param_doc += f" (default: {param_default})"
-                if param_name in required_params:
-                    param_doc += " (required)"
                     
                 params.append(param_doc)
         
@@ -175,6 +190,19 @@ def create_swaml():
         return jsonify(json.loads(swaml))
     else:
         return Response(swaml, mimetype='text/plain')
+    
+def log_request_data(request_data, endpoint_name):
+    """Helper function to log request data to a uniquely named file."""
+    # Create a unique filename using the current timestamp and a UUID
+    timestamp = int(time.time())  # Get the current time in seconds
+    unique_id = str(uuid.uuid4())  # Generate a UUID
+    log_file_path = f'logs/{endpoint_name}_request_{timestamp}_{unique_id}.log'  # Create a unique filename
+
+    # Save the raw JSON to a file in the logs directory
+    with open(log_file_path, 'w') as log_file:  # Use 'w' to create a new file
+        log_file.write(json.dumps(request_data, indent=4))  # Write the JSON data to the file
+
+    return log_file_path
 
 def log_request_data(request_data, endpoint_name):
     """Helper function to log request data to a uniquely named file."""
@@ -202,6 +230,7 @@ def post_prompt():
     request_data = request.json
     log_file_path = log_request_data(request_data, "postprompt")  # Log the request data with endpoint name
     return jsonify({"message": "Prompt received", "file": log_file_path}), 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=os.getenv("PORT", 5000), debug=os.getenv("DEBUG"))

@@ -6,6 +6,7 @@ services:
       FLASK_DEBUG: 1
     volumes:
       - ./hvac_bot/:/app
+      - ./signalwire_swaig/:/app/signalwire_swaig
       - ./prompts/:/app/prompts
     ports:
       - "5005:5000"
@@ -13,6 +14,7 @@ services:
     image: ngrok/ngrok:latest
     command:
       - "http"
+      - "--url=ngrok.relayhawk.io"
       - "http://hvac_bot:5000"
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}

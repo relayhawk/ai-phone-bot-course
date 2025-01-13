@@ -8,8 +8,9 @@ from jinja2 import Environment, FileSystemLoader
 import json
 import time
 from models.lead import Lead
-from marshmallow import ValidationError
+from models.service_address import ServiceAddress
 from models.appointment import Appointment
+from marshmallow import ValidationError
 import uuid  # Import the uuid module
 
 load_dotenv()
@@ -35,23 +36,31 @@ def create_appointment(date, time):
     return {"response": "Appointment created successfully"}
 
 @swaig.endpoint(**Lead.get_endpoint("create"))
-def swaig_create_lead(data: dict, meta_data_token: str) -> str:
+def swaig_create_lead(**kwargs) -> str:
     try:
-        lead = Lead().load(data)  # Validate and deserialize input
+        lead = Lead.create_from_kwargs(**kwargs)  # Validate and deserialize input
         # Process lead creation logic here
         return "Lead created successfully"
     except ValidationError as e:
         return f"Validation error: {e.messages}"
 
-@swaig.endpoint(**Appointment.get_endpoint("create"))
-def swaig_create_appointment(data: dict, meta_data_token: str) -> str:
+@swaig.endpoint(**ServiceAddress.get_endpoint("create"))
+def swaig_create_address(**kwargs) -> str:
     try:
-        appointment = Appointment().load(data)  # Validate and deserialize input
+        address = ServiceAddress.create_from_kwargs(**kwargs)  # Validate and deserialize input
+        # Process appointment creation logic here
+        return "Address created successfully"
+    except ValidationError as e:
+        return f"Validation error: {e.messages}"
+
+@swaig.endpoint(**Appointment.get_endpoint("create"))
+def swaig_create_appointment(**kwargs) -> str:
+    try:
+        appointment = Appointment.create_from_kwargs(**kwargs)  # Validate and deserialize input
         # Process appointment creation logic here
         return "Appointment created successfully"
     except ValidationError as e:
         return f"Validation error: {e.messages}"
-
 
 def get_ngrok_url():
     # ngrok exposes an API on port 4040
@@ -127,6 +136,7 @@ def generate_prompt_text(template_path, swaig_instance):
     
     template = env.from_string(template_content)
     
+    params_to_ignore = ["meta_data", "meta_data_token"]
     # Generate function documentation
     function_docs = []
     for idx, (func_name, func_info) in enumerate(swaig_instance.functions.items(), 1):
@@ -138,6 +148,8 @@ def generate_prompt_text(template_path, swaig_instance):
             required_params = func_info['parameters'].get('required', [])
             
             for param_name, param_info in properties.items():
+                if param_name in params_to_ignore:
+                    continue
                 param_type = param_info.get('type', 'string')
                 param_desc = param_info.get('description', '')
                 param_default = param_info.get('default')
@@ -179,8 +191,8 @@ def get_generate_prompt_text():
     return Response(prompt_text, mimetype='text/plain')
 
 # Example usage:
-@app.route('/generate_swaml', methods=['GET', 'POST'])
-def create_swaml():
+@app.route('/swml', methods=['GET', 'POST'])
+def create_swml():
     if request.method == 'POST':
         logging.info(f"Request: {request.json}")
     prompt_text = generate_prompt_text('prompts/hvac.j2', swaig)

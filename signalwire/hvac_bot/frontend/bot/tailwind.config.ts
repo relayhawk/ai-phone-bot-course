@@ -12,7 +12,7 @@ export default {
       // one way to change the default font for your project is to customize the sans key in your fontFamily
       // configuration. source: https://tailwindcss.com/docs/font-family
       'sans': ['-apple-system','objektiv-mk1','Roboto','sans-serif']
-  },
+    },
     extend: {
       colors: {
         background: "var(--background)",
@@ -86,5 +86,15 @@ export default {
       }
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addBase, theme }) {
+      addBase({
+        'h1': { color: theme('colors.rh-blue-800') },
+        'h2': { color: theme('colors.rh-blue-700') },
+        'h3': { color: theme('colors.rh-neutral-700') },
+        'p': { color: theme('colors.rh-neutral-600') },
+        'li': { color: theme('colors.rh-neutral-600') },
+      })
+    }
+  ],
 } satisfies Config;
